@@ -9,10 +9,10 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
 
-Private count_ As Integer
+Private count_ As Long
 Private hash_ As Scripting.Dictionary
 
-Public Property Get Count() As Integer
+Public Property Get Count() As Long
     Count = count_
 End Property
 
@@ -38,7 +38,7 @@ Public Function GetValues(val As Range) As RangeList
     
     Dim key As String
     Dim vs As RangeList
-    Dim i As Integer
+    Dim i As Long
     
     key = RangeToMD5(val)
     If hash_.Exists(key) Then
@@ -64,7 +64,7 @@ Private Function IsSame_(l As Range, r As Range) As Boolean
         Exit Function
     End If
     
-    Dim i As Integer
+    Dim i As Long
     
     For i = 1 To l.Cells.Count
         If l.Cells.Item(i).Value2 <> r.Cells.Item(i).Value2 Then

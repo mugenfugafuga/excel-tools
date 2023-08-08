@@ -7,8 +7,8 @@ Public Type MatchResult
 End Type
 
 Public Type MatchResults
-    Reserved As Integer
-    Count As Integer
+    Reserved As Long
+    Count As Long
     Results() As MatchResult
 End Type
 

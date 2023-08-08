@@ -9,11 +9,11 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
 
-Private count_ As Integer
-Private reserved_ As Integer
+Private count_ As Long
+Private reserved_ As Long
 Private values_() As Range
 
-Public Property Get Count() As Integer
+Public Property Get Count() As Long
     Count = count_
 End Property
 
@@ -40,15 +40,21 @@ Public Function Add(val As Range)
     Set values_(count_) = val
 End Function
 
-Public Function Item(index As Integer) As Range
+Public Function Item(index As Long) As Range
     Set Item = values_(index)
 End Function
 
 Public Property Get Items() As Range()
     Dim vs() As Range
+    
+    If count_ = 0 Then
+        ReDim Items(0)
+        Exit Function
+    End If
+    
     ReDim vs(1 To count_)
     
-    Dim i As Integer
+    Dim i As Long
     For i = 1 To Count
         Set vs(i) = values_(i)
     Next i
@@ -63,7 +69,7 @@ Private Sub Class_Initialize()
 End Sub
 
 Private Sub Class_Terminate()
-    Dim i As Integer
+    Dim i As Long
     For i = 1 To count_
         Set values_(i) = Nothing
     Next i
