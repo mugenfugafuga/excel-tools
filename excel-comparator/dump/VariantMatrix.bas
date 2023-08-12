@@ -1,6 +1,24 @@
 Attribute VB_Name = "VariantMatrix"
 Option Explicit
 
+Public Function PrintVariantOnSheet(vals As Variant, sht As Worksheet)
+    Dim lrow As Long, urow As Long
+    Dim lcol As Long, ucol As Long
+    
+    With sht
+        .Cells.Clear
+        
+        If IsEmpty(vals) Then
+            Exit Function
+        End If
+        
+        lrow = LBound(vals, 1): urow = UBound(vals, 1)
+        lcol = LBound(vals, 2): ucol = UBound(vals, 2)
+    
+        .Range(.Cells(1, 1), .Cells(urow - lrow + 1, ucol - lcol + 1)) = vals
+    End With
+End Function
+
 Public Function RangesToMatrix(ByRef rngs() As Range) As Variant
     Dim ret As Variant
     
@@ -16,7 +34,7 @@ Public Function RangesToMatrix(ByRef rngs() As Range) As Variant
     Dim clCnt As Long
     clCnt = rngs(1).Cells.Count
     
-    ReDim ret(1 To rwCnt, 1 To clCnt)
+    ReDim ret(1 To rwCnt, 1 To clCnt + 1)
     
     Dim r As Long, c As Long
     Dim rng As Range
@@ -24,20 +42,24 @@ Public Function RangesToMatrix(ByRef rngs() As Range) As Variant
     For r = 1 To rwCnt
         Set rng = rngs(r)
         
+        ret(r, 1) = GetSheetAddress_(rng)
+        
         With rng.Cells
             If rng.Cells.Count < clCnt Then
                 For c = 1 To rng.Cells.Count
-                    ret(r, c) = .Item(c)
+                    ret(r, c + 1) = .Item(c)
                 Next c
             Else
                 For c = 1 To clCnt
-                    ret(r, c) = .Item(c)
+                    ret(r, c + 1) = .Item(c)
                 Next c
             End If
         End With
         
         Set rng = Nothing
     Next r
+    
+    RangesToMatrix = ret
 End Function
 
 Public Function MatchResultsToMatrix(ByRef result As MatchResults, Optional headers As Boolean = True) As Variant

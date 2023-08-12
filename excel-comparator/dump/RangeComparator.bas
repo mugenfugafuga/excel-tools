@@ -17,13 +17,13 @@ Public Type RangeComparisonResult
     Rest() As Range
 End Type
 
-Public Function CompareTableWithHasSet(table As Range, hashSet As RangeHashSet) As RangeComparisonResult
+Public Function CompareTableWithRangeHasSet(table As Range, hashSet As RangeHashSet) As RangeComparisonResult
     Dim vs As RangeList
     Dim rw As Range
     
     Dim rst As New RangeList
     
-    With CompareTableWithHasSet
+    With CompareTableWithRangeHasSet
         For Each rw In table.Rows
             Set vs = hashSet.GetValues(rw)
             
@@ -42,6 +42,47 @@ Public Function CompareTableWithHasSet(table As Range, hashSet As RangeHashSet) 
             End If
             
             Set vs = Nothing
+        Next rw
+        
+        .Rest = rst.Items
+    End With
+End Function
+
+Public Function CompareTableWithTableDataHashSet(table As Range, hashSet As TableDataHashSet) As RangeComparisonResult
+    Dim vs As RangeList
+    Dim rw As Range
+    
+    Dim rst As New RangeList
+    
+    Dim columIndexMap As Scripting.Dictionary
+    
+    Dim firstRecord As Boolean
+    firstRecord = True
+
+    With CompareTableWithTableDataHashSet
+        For Each rw In table.Rows
+            If firstRecord Then
+                Set columIndexMap = CreateColumnIndexMap(rw)
+                firstRecord = False
+            Else
+                Set vs = hashSet.GetValues(columIndexMap, rw)
+                
+                If vs.Count = 0 Then
+                    rst.Add rw
+                Else
+                    Reserve_ .Matchs
+                    
+                    With .Matchs
+                        .Count = .Count + 1
+                        With .Results(.Count)
+                            Set .Value = rw
+                            .Matchs = vs.Items
+                        End With
+                    End With
+                End If
+                
+                Set vs = Nothing
+            End If
         Next rw
         
         .Rest = rst.Items
