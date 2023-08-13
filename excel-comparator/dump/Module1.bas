@@ -6,6 +6,9 @@ Private Const compSheet_ As String = "データ比較"
 Private Const file1Range_ As String = "FILE1"
 Private Const file2Range_ As String = "FILE2"
 
+Private Const withColumnNames_ As String = "w/ column name"
+Private Const allRows_ As String = "all row"
+
 Private Type FileItem_
     Path As String
     Charset As String
@@ -22,7 +25,7 @@ Private Enum CompType_
     No2WithNo1
 End Enum
 
-Sub File1_UTF8_Click()
+Sub File1_UTF8_W_Columns_Click()
     Dim fileName As String
     fileName = SelectFile("①UTF8のファイルを選択してください。")
     
@@ -35,12 +38,13 @@ Sub File1_UTF8_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
+        .Offset(rw, -1) = withColumnNames_
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = UTF8Charset
     End With
 End Sub
 
-Sub File1_SJIS_Click()
+Sub File1_SJIS_W_Columns_Click()
     Dim fileName As String
     fileName = SelectFile("①SJISのファイルを選択してください。")
     
@@ -53,6 +57,45 @@ Sub File1_SJIS_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
+        .Offset(rw, -1) = withColumnNames_
+        .Offset(rw, 0) = fileName
+        .Offset(rw, 1) = SJISCharset
+    End With
+End Sub
+
+Sub File1_UTF8_All_Rows_Click()
+    Dim fileName As String
+    fileName = SelectFile("①UTF8のファイルを選択してください。")
+    
+    If fileName = "" Then
+        Exit Sub
+    End If
+    
+    Dim rw As Long
+    
+    With Range(file1Range_)
+        rw = .CurrentRegion.Rows.Count
+        
+        .Offset(rw, -1) = allRows_
+        .Offset(rw, 0) = fileName
+        .Offset(rw, 1) = UTF8Charset
+    End With
+End Sub
+
+Sub File1_SJIS_All_Rows_Click()
+    Dim fileName As String
+    fileName = SelectFile("①SJISのファイルを選択してください。")
+    
+    If fileName = "" Then
+        Exit Sub
+    End If
+    
+    Dim rw As Long
+    
+    With Range(file1Range_)
+        rw = .CurrentRegion.Rows.Count
+        
+        .Offset(rw, -1) = allRows_
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = SJISCharset
     End With
@@ -120,6 +163,7 @@ Private Function DoCompareFiles_(ctype As CompType_)
     Dim empties As Boolean
     
     Dim f1 As FileItem_, f2 As FileItem_
+    Dim fileType As String
     
     With ThisWorkbook.Sheets(compSheet_)
         no1cnt = .Range(file1Range_).CurrentRegion.Rows.Count
@@ -141,6 +185,12 @@ Private Function DoCompareFiles_(ctype As CompType_)
             
             If Not empties Then
                 With .Range(file1Range_).Cells(i, 1)
+                    If IsEmpty(.Offset(0, -1)) Then
+                        fileType = allRows_
+                    Else
+                        fileType = .Offset(0, -1).Value2
+                    End If
+                
                     f1.Path = CStr(.Offset(0, 0).Value2)
                     f1.Charset = CStr(.Offset(0, 1).Value2)
                 End With
@@ -150,7 +200,7 @@ Private Function DoCompareFiles_(ctype As CompType_)
                     f2.Charset = CStr(.Offset(0, 1).Value2)
                 End With
                 
-                DoCompare_ f1, f2, ctype
+                DoCompare_ fileType, f1, f2, ctype
             End If
         Next i
     End With
@@ -158,7 +208,7 @@ Private Function DoCompareFiles_(ctype As CompType_)
     TryDeleteTempFiles
 End Function
 
-Private Function DoCompare_(file1 As FileItem_, file2 As FileItem_, ctype As CompType_)
+Private Function DoCompare_(fileType As String, file1 As FileItem_, file2 As FileItem_, ctype As CompType_)
     Dim wb1 As Workbook, wb2 As Workbook
     Dim resultbook As Workbook
     
@@ -198,6 +248,7 @@ Private Function DoCompare_(file1 As FileItem_, file2 As FileItem_, ctype As Com
     
     If ctype <> No2WithNo1 Then
         com1With2Result = AddComparisonResultAfterTarget_( _
+            fileType, _
             run, no1rng, no2rng, _
             "①を②に突合せた結果", "①にあって②にない", xlThemeColorAccent6)
         Set run = com1With2Result.Rest
@@ -205,6 +256,7 @@ Private Function DoCompare_(file1 As FileItem_, file2 As FileItem_, ctype As Com
     
     If ctype <> No1WithNo2 Then
         com2With1Result = AddComparisonResultAfterTarget_( _
+            fileType, _
             run, no2rng, no1rng, _
             "②を①に突合せた結果", "②にあって①にない", xlThemeColorAccent5)
     End If
@@ -219,12 +271,13 @@ Private Function DoCompare_(file1 As FileItem_, file2 As FileItem_, ctype As Com
             End With
         End With
         
-        ResultSummary_ .Sheets(1), file1, no1, file2, no2, com1With2Result, com2With1Result
+        ResultSummary_ fileType, .Sheets(1), file1, no1, file2, no2, com1With2Result, com2With1Result
     End With
     
 End Function
 
 Private Function ResultSummary_( _
+    fileType As String, _
     sht As Worksheet, _
     file1 As FileItem_, sheet1 As Worksheet, _
     file2 As FileItem_, sheet2 As Worksheet, _
@@ -233,8 +286,14 @@ Private Function ResultSummary_( _
     With sht.Cells(2, 2)
         With .Offset(0, 0)
             .Offset(0, 0) = "テーブル": .Offset(0, 1) = "レコード数": .Offset(0, 2) = "ファイル"
-            .Offset(1, 0) = "①": .Offset(1, 1) = sheet1.UsedRange.Rows.Count - 1: .Offset(1, 2) = file1.Path
-            .Offset(2, 0) = "②": .Offset(2, 1) = sheet2.UsedRange.Rows.Count - 1: .Offset(2, 2) = file2.Path
+        
+            If fileType = withColumnNames_ Then
+                .Offset(1, 0) = "①": .Offset(1, 1) = sheet1.UsedRange.Rows.Count - 1: .Offset(1, 2) = file1.Path
+                .Offset(2, 0) = "②": .Offset(2, 1) = sheet2.UsedRange.Rows.Count - 1: .Offset(2, 2) = file2.Path
+            Else 'if fileType = allRows_ Then
+                .Offset(1, 0) = "①": .Offset(1, 1) = sheet1.UsedRange.Rows.Count: .Offset(1, 2) = file1.Path
+                .Offset(2, 0) = "②": .Offset(2, 1) = sheet2.UsedRange.Rows.Count: .Offset(2, 2) = file2.Path
+            End If
         End With
         
         With .Offset(4, 0)
@@ -280,6 +339,7 @@ Private Function ResultSummary_( _
 End Function
 
 Private Function AddComparisonResultAfterTarget_( _
+    fileType As String, _
     target As Worksheet, _
     rng1 As Range, _
     rng2 As Range, _
@@ -290,7 +350,12 @@ Private Function AddComparisonResultAfterTarget_( _
     
     With AddComparisonResultAfterTarget_
         Dim rngComResult As RangeComparisonResult
-        rngComResult = CompareTableWithTableDataHashSet(rng1, CreateTableDataHashSet(rng2))
+        
+        If fileType = withColumnNames_ Then
+            rngComResult = CompareTableWithTableDataHashSet(rng1, CreateTableDataHashSet(rng2))
+        Else 'if fileType = allRows_ Then
+            rngComResult = CompareTableWithRangeHasSet(rng1, CreateRowHashSet(rng2))
+        End If
         
         Set .Comparison = AddSheetAfter(target)
         PrintVariantOnSheet MatchResultsToMatrix(rngComResult.Matchs), .Comparison
