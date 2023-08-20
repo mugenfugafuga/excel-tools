@@ -41,10 +41,3 @@ Public Function SheetExists(sheetName As String, Optional book As Workbook = Not
         SheetExists = False
     End If
 End Function
-
-Private Sub Test_()
-    Debug.Print SheetExists("Sheet1")
-    Debug.Print SheetExists("Sheet1x")
-    Debug.Print SheetExists("Sheet1", ThisWorkbook)
-    Debug.Print SheetExists("Sheet1x", ThisWorkbook)
-End Sub

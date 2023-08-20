@@ -172,7 +172,7 @@ Sub File2_SJIS_Click()
         rw = .CurrentRegion.Rows.Count
         
         .Offset(rw, 0) = fileName
-        .Offset(rw, 1) = UTF8Charset
+        .Offset(rw, 1) = SJISCharset
     End With
 End Sub
 

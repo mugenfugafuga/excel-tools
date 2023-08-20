@@ -191,15 +191,3 @@ Private Function GetEditPoints_(a As Range, b As Range, editGrph() As Direction_
     
     GetEditPoints_ = eps
 End Function
-
-Private Function Test_()
-    With ActiveWorkbook
-        PrintVariantOnSheet _
-            EditPointsToMatrix( _
-            DiffExcel(.Sheets("Sheet1").Range("A1").CurrentRegion, .Sheets("Sheet1").Range("A11").CurrentRegion, False, 0) _
-            ), .Sheets("Sheet2")
-    End With
-End Function
-
-
-

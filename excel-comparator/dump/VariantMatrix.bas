@@ -1,7 +1,7 @@
 Attribute VB_Name = "VariantMatrix"
 Option Explicit
 
-Public Function PrintVariantOnSheet(vals As Variant, sht As Worksheet)
+Public Function PrintVariantOnSheet(vals As Variant, sht As Worksheet) As Range
     Dim lrow As Long, urow As Long
     Dim lcol As Long, ucol As Long
     
@@ -16,6 +16,28 @@ Public Function PrintVariantOnSheet(vals As Variant, sht As Worksheet)
         lcol = LBound(vals, 2): ucol = UBound(vals, 2)
     
         .Range(.Cells(1, 1), .Cells(urow - lrow + 1, ucol - lcol + 1)) = vals
+        
+        Set PrintVariantOnSheet = .Range(.Cells(1, 1), .Cells(urow - lrow + 1, ucol - lcol + 1))
+    End With
+End Function
+
+Public Function PrintVariantOnRange(vals As Variant, rng As Range) As Range
+    Dim lrow As Long, urow As Long
+    Dim lcol As Long, ucol As Long
+    
+    rng.Cells.Clear
+    
+    If IsEmpty(vals) Then
+        Exit Function
+    End If
+    
+    With rng.Cells.Item(1)
+        lrow = LBound(vals, 1): urow = UBound(vals, 1)
+        lcol = LBound(vals, 2): ucol = UBound(vals, 2)
+        
+        Range(.Offset(0, 0), .Offset(urow - lrow, ucol - lcol)) = vals
+        
+        Set PrintVariantOnRange = Range(.Offset(0, 0), .Cells(urow - lrow, ucol - lcol))
     End With
 End Function
 
@@ -35,31 +57,23 @@ Public Function EditPointsToMatrix(ByRef editPnts() As EditPoint) As Variant
     Dim num As Long
     num = UBound(editPnts)
 
-    ReDim ret(1 To num, 1 To alen + blen + 5)
+    ReDim ret(1 To num, 1 To alen + blen + 3)
     
     Dim r As Long, c As Long
     
     For r = 1 To num
         With editPnts(r)
-            If .ABType = Both Then
-                ret(r, 1) = "Same"
-            ElseIf .ABType = BBRow Then
-                ret(r, 1) = "Left"
-            Else 'ElseIf .ABType = AARow Then
-                ret(r, 1) = "Right"
-            End If
-        
             If Not .BBRow Is Nothing Then
-                ret(r, 3) = GetSheetAddress_(.BBRow)
+                ret(r, 1) = GetSheetAddress_(.BBRow)
                 For c = 1 To blen
-                    ret(r, 3 + c) = .BBRow.Cells.Item(c).Value2
+                    ret(r, 1 + c) = .BBRow.Cells.Item(c).Value2
                 Next c
             End If
         
             If Not .AARow Is Nothing Then
-                ret(r, blen + 5) = GetSheetAddress_(.AARow)
+                ret(r, blen + 3) = GetSheetAddress_(.AARow)
                 For c = 1 To alen
-                    ret(r, blen + 5 + c) = .AARow.Cells.Item(c).Value2
+                    ret(r, blen + 3 + c) = .AARow.Cells.Item(c).Value2
                 Next c
             End If
         End With
