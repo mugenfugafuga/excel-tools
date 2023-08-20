@@ -19,6 +19,82 @@ Public Function PrintVariantOnSheet(vals As Variant, sht As Worksheet)
     End With
 End Function
 
+Public Function EditPointsToMatrix(ByRef editPnts() As EditPoint) As Variant
+    Dim ret As Variant
+    
+    If UBound(editPnts) = 0 Then
+        ReDim ret(0, 0)
+        EditPointsToMatrix = ret
+        Exit Function
+    End If
+
+    Dim alen As Long, blen As Long
+    alen = GetARowLen_(editPnts)
+    blen = GetBRowLen_(editPnts)
+    
+    Dim num As Long
+    num = UBound(editPnts)
+
+    ReDim ret(1 To num, 1 To alen + blen + 5)
+    
+    Dim r As Long, c As Long
+    
+    For r = 1 To num
+        With editPnts(r)
+            If .ABType = Both Then
+                ret(r, 1) = "Same"
+            ElseIf .ABType = BBRow Then
+                ret(r, 1) = "Left"
+            Else 'ElseIf .ABType = AARow Then
+                ret(r, 1) = "Right"
+            End If
+        
+            If Not .BBRow Is Nothing Then
+                ret(r, 3) = GetSheetAddress_(.BBRow)
+                For c = 1 To blen
+                    ret(r, 3 + c) = .BBRow.Cells.Item(c).Value2
+                Next c
+            End If
+        
+            If Not .AARow Is Nothing Then
+                ret(r, blen + 5) = GetSheetAddress_(.AARow)
+                For c = 1 To alen
+                    ret(r, blen + 5 + c) = .AARow.Cells.Item(c).Value2
+                Next c
+            End If
+        End With
+    Next r
+    
+    EditPointsToMatrix = ret
+End Function
+
+Private Function GetARowLen_(ByRef editPnts() As EditPoint) As Long
+    Dim i As Long
+    
+    For i = 1 To UBound(editPnts)
+        With editPnts(i)
+            If Not .AARow Is Nothing Then
+                GetARowLen_ = .AARow.Cells.Count
+                Exit Function
+            End If
+        End With
+    Next i
+    
+End Function
+
+Private Function GetBRowLen_(ByRef editPnts() As EditPoint) As Long
+    Dim i As Long
+    
+    For i = 1 To UBound(editPnts)
+        With editPnts(i)
+            If Not .BBRow Is Nothing Then
+                GetBRowLen_ = .BBRow.Cells.Count
+                Exit Function
+            End If
+        End With
+    Next i
+    
+End Function
 Public Function RangesToMatrix(ByRef rngs() As Range) As Variant
     Dim ret As Variant
     

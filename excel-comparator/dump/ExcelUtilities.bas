@@ -42,7 +42,7 @@ Public Function SheetExists(sheetName As String, Optional book As Workbook = Not
     End If
 End Function
 
-Private Sub test_()
+Private Sub Test_()
     Debug.Print SheetExists("Sheet1")
     Debug.Print SheetExists("Sheet1x")
     Debug.Print SheetExists("Sheet1", ThisWorkbook)

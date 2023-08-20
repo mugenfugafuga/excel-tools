@@ -8,6 +8,7 @@ Private Const file2Range_ As String = "FILE2"
 
 Private Const withColumnNames_ As String = "w/ column name"
 Private Const allRows_ As String = "all row"
+Private Const diff_ As String = "diff"
 
 Private Type FileItem_
     Path As String
@@ -101,6 +102,44 @@ Sub File1_SJIS_All_Rows_Click()
     End With
 End Sub
 
+Sub File1_UTF8_Diff_Click()
+    Dim fileName As String
+    fileName = SelectFile("á@UTF8ÇÃÉtÉ@ÉCÉãÇëIëÇµÇƒÇ≠ÇæÇ≥Ç¢ÅB")
+    
+    If fileName = "" Then
+        Exit Sub
+    End If
+    
+    Dim rw As Long
+    
+    With Range(file1Range_)
+        rw = .CurrentRegion.Rows.Count
+        
+        .Offset(rw, -1) = diff_
+        .Offset(rw, 0) = fileName
+        .Offset(rw, 1) = UTF8Charset
+    End With
+End Sub
+
+Sub File1_SJIS_Diff_Click()
+    Dim fileName As String
+    fileName = SelectFile("á@SJISÇÃÉtÉ@ÉCÉãÇëIëÇµÇƒÇ≠ÇæÇ≥Ç¢ÅB")
+    
+    If fileName = "" Then
+        Exit Sub
+    End If
+    
+    Dim rw As Long
+    
+    With Range(file1Range_)
+        rw = .CurrentRegion.Rows.Count
+        
+        .Offset(rw, -1) = diff_
+        .Offset(rw, 0) = fileName
+        .Offset(rw, 1) = SJISCharset
+    End With
+End Sub
+
 Sub File2_UTF8_Click()
     Dim fileName As String
     fileName = SelectFile("áAUTF8ÇÃÉtÉ@ÉCÉãÇëIëÇµÇƒÇ≠ÇæÇ≥Ç¢ÅB")
@@ -163,7 +202,7 @@ Private Function DoCompareFiles_(ctype As CompType_)
     Dim empties As Boolean
     
     Dim f1 As FileItem_, f2 As FileItem_
-    Dim fileType As String
+    Dim compType As String
     
     With ThisWorkbook.Sheets(compSheet_)
         no1cnt = .Range(file1Range_).CurrentRegion.Rows.Count
@@ -186,9 +225,9 @@ Private Function DoCompareFiles_(ctype As CompType_)
             If Not empties Then
                 With .Range(file1Range_).Cells(i, 1)
                     If IsEmpty(.Offset(0, -1)) Then
-                        fileType = allRows_
+                        compType = allRows_
                     Else
-                        fileType = .Offset(0, -1).Value2
+                        compType = .Offset(0, -1).Value2
                     End If
                 
                     f1.Path = CStr(.Offset(0, 0).Value2)
@@ -200,7 +239,11 @@ Private Function DoCompareFiles_(ctype As CompType_)
                     f2.Charset = CStr(.Offset(0, 1).Value2)
                 End With
                 
-                DoCompare_ fileType, f1, f2, ctype
+                If compType = diff_ Then
+                    DoDiff_ f1, f2
+                Else
+                    DoCompare_ compType, f1, f2, ctype
+                End If
             End If
         Next i
     End With
@@ -208,7 +251,55 @@ Private Function DoCompareFiles_(ctype As CompType_)
     TryDeleteTempFiles
 End Function
 
-Private Function DoCompare_(fileType As String, file1 As FileItem_, file2 As FileItem_, ctype As CompType_)
+Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_)
+    Dim wb1 As Workbook, wb2 As Workbook
+    Dim resultbook As Workbook
+    
+    Dim no1 As Worksheet, no2 As Worksheet
+    
+    Dim no1rng As Range, no2rng As Range
+    
+    Set resultbook = NewWorkBook(1)
+    
+    Dim com1With2Result As ComResult_
+    Dim com2With1Result As ComResult_
+    
+    Set wb1 = OpenBook_(file1)
+    With wb1
+        Set no1 = CopySheetAfterTarget(.Sheets(1), resultbook.Sheets(1))
+        no1.Name = "á@"
+        no1.Cells.EntireColumn.AutoFit
+        Set no1rng = no1.UsedRange
+        
+        .Close
+        Set wb1 = Nothing
+    End With
+    
+    Set wb2 = OpenBook_(file2)
+    With wb2
+        Set no2 = CopySheetAfterTarget(.Sheets(1), no1)
+        no2.Name = "áA"
+        no2.Cells.EntireColumn.AutoFit
+        Set no2rng = no2.UsedRange
+    
+        .Close
+        Set wb2 = Nothing
+    End With
+        
+    With resultbook
+        PrintVariantOnSheet _
+            EditPointsToMatrix(DiffExcel(no1.UsedRange, no2.UsedRange)), _
+            .Sheets(1)
+            
+        With .Sheets(1)
+            .Name = "åãâ "
+            .Cells.EntireColumn.AutoFit
+            .Activate
+        End With
+    End With
+End Function
+
+Private Function DoCompare_(compType As String, file1 As FileItem_, file2 As FileItem_, ctype As CompType_)
     Dim wb1 As Workbook, wb2 As Workbook
     Dim resultbook As Workbook
     
@@ -248,7 +339,7 @@ Private Function DoCompare_(fileType As String, file1 As FileItem_, file2 As Fil
     
     If ctype <> No2WithNo1 Then
         com1With2Result = AddComparisonResultAfterTarget_( _
-            fileType, _
+            compType, _
             run, no1rng, no2rng, _
             "á@ÇáAÇ…ìÀçáÇπÇΩåãâ ", "á@Ç…Ç†Ç¡ÇƒáAÇ…Ç»Ç¢", xlThemeColorAccent6)
         Set run = com1With2Result.Rest
@@ -256,7 +347,7 @@ Private Function DoCompare_(fileType As String, file1 As FileItem_, file2 As Fil
     
     If ctype <> No1WithNo2 Then
         com2With1Result = AddComparisonResultAfterTarget_( _
-            fileType, _
+            compType, _
             run, no2rng, no1rng, _
             "áAÇá@Ç…ìÀçáÇπÇΩåãâ ", "áAÇ…Ç†Ç¡Çƒá@Ç…Ç»Ç¢", xlThemeColorAccent5)
     End If
@@ -271,13 +362,13 @@ Private Function DoCompare_(fileType As String, file1 As FileItem_, file2 As Fil
             End With
         End With
         
-        ResultSummary_ fileType, .Sheets(1), file1, no1, file2, no2, com1With2Result, com2With1Result
+        ResultSummary_ compType, .Sheets(1), file1, no1, file2, no2, com1With2Result, com2With1Result
     End With
     
 End Function
 
 Private Function ResultSummary_( _
-    fileType As String, _
+    compType As String, _
     sht As Worksheet, _
     file1 As FileItem_, sheet1 As Worksheet, _
     file2 As FileItem_, sheet2 As Worksheet, _
@@ -287,10 +378,10 @@ Private Function ResultSummary_( _
         With .Offset(0, 0)
             .Offset(0, 0) = "ÉeÅ[ÉuÉã": .Offset(0, 1) = "ÉåÉRÅ[Éhêî": .Offset(0, 2) = "ÉtÉ@ÉCÉã"
         
-            If fileType = withColumnNames_ Then
+            If compType = withColumnNames_ Then
                 .Offset(1, 0) = "á@": .Offset(1, 1) = sheet1.UsedRange.Rows.Count - 1: .Offset(1, 2) = file1.Path
                 .Offset(2, 0) = "áA": .Offset(2, 1) = sheet2.UsedRange.Rows.Count - 1: .Offset(2, 2) = file2.Path
-            Else 'if fileType = allRows_ Then
+            Else 'if compType = allRows_ Then
                 .Offset(1, 0) = "á@": .Offset(1, 1) = sheet1.UsedRange.Rows.Count: .Offset(1, 2) = file1.Path
                 .Offset(2, 0) = "áA": .Offset(2, 1) = sheet2.UsedRange.Rows.Count: .Offset(2, 2) = file2.Path
             End If
@@ -339,7 +430,7 @@ Private Function ResultSummary_( _
 End Function
 
 Private Function AddComparisonResultAfterTarget_( _
-    fileType As String, _
+    compType As String, _
     target As Worksheet, _
     rng1 As Range, _
     rng2 As Range, _
@@ -351,9 +442,9 @@ Private Function AddComparisonResultAfterTarget_( _
     With AddComparisonResultAfterTarget_
         Dim rngComResult As RangeComparisonResult
         
-        If fileType = withColumnNames_ Then
+        If compType = withColumnNames_ Then
             rngComResult = CompareTableWithTableDataHashSet(rng1, CreateTableDataHashSet(rng2))
-        Else 'if fileType = allRows_ Then
+        Else 'if compType = allRows_ Then
             rngComResult = CompareTableWithRangeHasSet(rng1, CreateRowHashSet(rng2))
         End If
         
