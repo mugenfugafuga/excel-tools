@@ -1,6 +1,11 @@
 Attribute VB_Name = "VariantMatrix"
 Option Explicit
 
+Public Type TwoMatrices
+    Left As Variant
+    Right As Variant
+End Type
+
 Public Function PrintVariantOnSheet(vals As Variant, sht As Worksheet) As Range
     Dim lrow As Long, urow As Long
     Dim lcol As Long, ucol As Long
@@ -37,16 +42,20 @@ Public Function PrintVariantOnRange(vals As Variant, rng As Range) As Range
         
         Range(.Offset(0, 0), .Offset(urow - lrow, ucol - lcol)) = vals
         
-        Set PrintVariantOnRange = Range(.Offset(0, 0), .Cells(urow - lrow, ucol - lcol))
+        Set PrintVariantOnRange = Range(.Offset(0, 0), .Offset(urow - lrow, ucol - lcol))
     End With
 End Function
 
-Public Function EditPointsToMatrix(ByRef editPnts() As EditPoint) As Variant
-    Dim ret As Variant
-    
+Public Function EditPointsTo2Matrices(ByRef editPnts() As EditPoint) As TwoMatrices
     If UBound(editPnts) = 0 Then
+        Dim ret As Variant
         ReDim ret(0, 0)
-        EditPointsToMatrix = ret
+        
+        With EditPointsTo2Matrices
+            .Left = ret
+            .Right = ret
+        End With
+        
         Exit Function
     End If
 
@@ -57,29 +66,38 @@ Public Function EditPointsToMatrix(ByRef editPnts() As EditPoint) As Variant
     Dim num As Long
     num = UBound(editPnts)
 
-    ReDim ret(1 To num, 1 To alen + blen + 3)
+    Dim lvals As Variant, rvals As Variant
+    ReDim lvals(1 To num, 1 To alen + 1)
+    ReDim rvals(1 To num, 1 To blen + 1)
     
     Dim r As Long, c As Long
     
     For r = 1 To num
         With editPnts(r)
             If Not .BBRow Is Nothing Then
-                ret(r, 1) = GetSheetAddress_(.BBRow)
+                lvals(r, 1) = GetSheetAddress_(.BBRow)
                 For c = 1 To blen
-                    ret(r, 1 + c) = .BBRow.Cells.Item(c).Value2
+                    lvals(r, c + 1) = .BBRow.Cells.Item(c).Value2
                 Next c
             End If
+        End With
+    Next r
         
+    For r = 1 To num
+        With editPnts(r)
             If Not .AARow Is Nothing Then
-                ret(r, blen + 3) = GetSheetAddress_(.AARow)
+                rvals(r, 1) = GetSheetAddress_(.AARow)
                 For c = 1 To alen
-                    ret(r, blen + 3 + c) = .AARow.Cells.Item(c).Value2
+                    rvals(r, c + 1) = .AARow.Cells.Item(c).Value2
                 Next c
             End If
         End With
     Next r
     
-    EditPointsToMatrix = ret
+    With EditPointsTo2Matrices
+        .Left = lvals
+        .Right = rvals
+    End With
 End Function
 
 Private Function GetARowLen_(ByRef editPnts() As EditPoint) As Long

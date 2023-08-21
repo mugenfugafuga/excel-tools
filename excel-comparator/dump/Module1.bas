@@ -39,7 +39,9 @@ Sub File1_UTF8_W_Columns_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
-        .Offset(rw, -1) = withColumnNames_
+        .Offset(rw, -3) = withColumnNames_
+        .Offset(rw, -2) = "-"
+        .Offset(rw, -1) = "Š®‘Sˆê’v"
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = UTF8Charset
     End With
@@ -58,7 +60,9 @@ Sub File1_SJIS_W_Columns_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
-        .Offset(rw, -1) = withColumnNames_
+        .Offset(rw, -3) = withColumnNames_
+        .Offset(rw, -2) = "-"
+        .Offset(rw, -1) = "Š®‘Sˆê’v"
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = SJISCharset
     End With
@@ -77,7 +81,9 @@ Sub File1_UTF8_All_Rows_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
-        .Offset(rw, -1) = allRows_
+        .Offset(rw, -3) = allRows_
+        .Offset(rw, -2) = "-"
+        .Offset(rw, -1) = "Š®‘Sˆê’v"
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = UTF8Charset
     End With
@@ -96,7 +102,9 @@ Sub File1_SJIS_All_Rows_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
-        .Offset(rw, -1) = allRows_
+        .Offset(rw, -3) = allRows_
+        .Offset(rw, -2) = "-"
+        .Offset(rw, -1) = "Š®‘Sˆê’v"
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = SJISCharset
     End With
@@ -115,7 +123,9 @@ Sub File1_UTF8_Diff_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
-        .Offset(rw, -1) = diff_
+        .Offset(rw, -3) = diff_
+        .Offset(rw, -2) = True
+        .Offset(rw, -1) = 0
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = UTF8Charset
     End With
@@ -134,7 +144,9 @@ Sub File1_SJIS_Diff_Click()
     With Range(file1Range_)
         rw = .CurrentRegion.Rows.Count
         
-        .Offset(rw, -1) = diff_
+        .Offset(rw, -3) = diff_
+        .Offset(rw, -2) = True
+        .Offset(rw, -1) = 0
         .Offset(rw, 0) = fileName
         .Offset(rw, 1) = SJISCharset
     End With
@@ -196,7 +208,7 @@ End Sub
 
 Private Function DoCompareFiles_(ctype As CompType_)
     Dim no1cnt As Long, no2cnt As Long
-    Dim cnt As Long
+    Dim cnt As Long, ignoreNum As Boolean, tolernce As Long
     
     Dim i As Long
     Dim empties As Boolean
@@ -223,27 +235,30 @@ Private Function DoCompareFiles_(ctype As CompType_)
             End With
             
             If Not empties Then
-                With .Range(file1Range_).Cells(i, 1)
-                    If IsEmpty(.Offset(0, -1)) Then
-                        compType = allRows_
-                    Else
-                        compType = .Offset(0, -1).Value2
-                    End If
-                
-                    f1.Path = CStr(.Offset(0, 0).Value2)
-                    f1.Charset = CStr(.Offset(0, 1).Value2)
-                End With
-                
                 With .Range(file2Range_).Cells(i, 1)
                     f2.Path = CStr(.Offset(0, 0).Value2)
                     f2.Charset = CStr(.Offset(0, 1).Value2)
                 End With
                 
-                If compType = diff_ Then
-                    DoDiff_ f1, f2
-                Else
-                    DoCompare_ compType, f1, f2, ctype
-                End If
+                With .Range(file1Range_).Cells(i, 1)
+                    f1.Path = CStr(.Offset(0, 0).Value2)
+                    f1.Charset = CStr(.Offset(0, 1).Value2)
+                    
+                    If IsEmpty(.Offset(0, -3)) Then
+                        compType = allRows_
+                    Else
+                        compType = .Offset(0, -3).Value2
+                    End If
+                
+                    If compType = diff_ Then
+                        ignoreNum = .Offset(0, -2)
+                        tolernce = .Offset(0, -1)
+                        
+                        DoDiff_ f1, f2, ignoreNum, tolernce
+                    Else
+                        DoCompare_ compType, f1, f2, ctype
+                    End If
+                End With
             End If
         Next i
     End With
@@ -251,7 +266,7 @@ Private Function DoCompareFiles_(ctype As CompType_)
     TryDeleteTempFiles
 End Function
 
-Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_)
+Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_, ignoreNum As Boolean, tolernce As Long)
     Dim wb1 As Workbook, wb2 As Workbook
     Dim resultbook As Workbook
     
@@ -285,17 +300,72 @@ Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_)
         .Close
         Set wb2 = Nothing
     End With
+    
+    Dim twoM As TwoMatrices
+    Dim lr As Range, rr As Range
+    Dim th1 As Range, th2 As Range
+    
+    With resultbook.Sheets(1)
+        twoM = EditPointsTo2Matrices(DiffExcel(no1.UsedRange, no2.UsedRange, ignoreNum, tolernce))
         
-    With resultbook
-        PrintVariantOnSheet _
-            EditPointsToMatrix(DiffExcel(no1.UsedRange, no2.UsedRange)), _
-            .Sheets(1)
+        With .Cells(5, 1)
+            .Offset(0, 0) = "è‡’l1": .Offset(0, 1) = 1000
+            .Offset(0, 0).HorizontalAlignment = xlRight
+            Set th1 = .Offset(0, 1)
             
-        With .Sheets(1)
-            .Name = "Œ‹‰Ê"
-            .Cells.EntireColumn.AutoFit
-            .Activate
+            .Offset(0, 2) = "è‡’l2": .Offset(0, 3) = 0.00001
+            .Offset(0, 2).HorizontalAlignment = xlRight
+            Set th2 = .Offset(0, 3)
         End With
+        
+        Set lr = PrintVariantOnRange(twoM.Left, .Cells(7, 1))
+        Set rr = PrintVariantOnRange(twoM.Right, lr.Cells(1, lr.Columns.Count).Offset(0, 2))
+        
+        UpdateFormatConditions_ SkipColumns_(lr), SkipColumns_(rr), th1, th2
+        UpdateFormatConditions_ SkipColumns_(rr), SkipColumns_(lr), th1, th2
+        
+        .Name = "Œ‹‰Ê"
+        .Cells.EntireColumn.AutoFit
+        
+        With .Cells(2, 1)
+            .Offset(0, 0) = "‡@": .Offset(0, 0).HorizontalAlignment = xlRight: .Offset(0, 1) = file1.Path
+            .Offset(1, 0) = "‡A": .Offset(1, 0).HorizontalAlignment = xlRight: .Offset(1, 1) = file2.Path
+        End With
+        
+        .Activate
+    End With
+End Function
+
+Private Function UpdateFormatConditions_( _
+    target As Range, _
+    othr As Range, _
+    th1 As Range, _
+    th2 As Range)
+    Dim ttop As String, otop As String
+    ttop = target.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+    otop = othr.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+
+    With target.FormatConditions
+        .Delete
+        
+        .Add Type:=xlExpression, Formula1:="=ISBLANK(" & ttop & ")"
+        .Item(1).Interior.Color = RGB(250, 250, 210)
+        
+        .Add Type:=xlExpression, Formula1:="=ABS(" & ttop & "-" & otop & ")>" & th1.Cells(1, 1).Address
+        .Item(2).Interior.Color = RGB(255, 165, 0)
+        
+        .Add Type:=xlExpression, Formula1:="=ABS(" & ttop & "-" & otop & ")>" & th2.Cells(1, 1).Address
+        .Item(3).Interior.Color = RGB(175, 238, 238)
+        
+        .Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=" & otop
+        .Item(4).Interior.Color = RGB(255, 99, 71)
+        
+    End With
+End Function
+
+Private Function SkipColumns_(rng As Range, Optional cols As Long = 1) As Range
+    With rng
+        Set SkipColumns_ = Range(.Cells(1, cols + 1), .Cells(.Rows.Count, .Columns.Count))
     End With
 End Function
 
