@@ -63,32 +63,48 @@ Public Function EditPointsTo2Matrices(ByRef editPnts() As EditPoint) As TwoMatri
     alen = GetARowLen_(editPnts)
     blen = GetBRowLen_(editPnts)
     
-    Dim num As Long
+    Dim num As Long, colnum As Long
     num = UBound(editPnts)
+    If alen > blen Then
+        colnum = alen
+    Else
+        colnum = blen
+    End If
+
 
     Dim lvals As Variant, rvals As Variant
-    ReDim lvals(1 To num, 1 To alen + 1)
-    ReDim rvals(1 To num, 1 To blen + 1)
+    ReDim lvals(0 To num, 0 To colnum)
+    ReDim rvals(0 To num, 0 To colnum)
     
     Dim r As Long, c As Long
+    
+    lvals(0, 0) = "address"
+    For c = 1 To colnum
+        lvals(0, c) = "column" & c
+    Next c
     
     For r = 1 To num
         With editPnts(r)
             If Not .BBRow Is Nothing Then
-                lvals(r, 1) = GetSheetAddress_(.BBRow)
+                lvals(r, 0) = GetSheetAddress_(.BBRow)
                 For c = 1 To blen
-                    lvals(r, c + 1) = .BBRow.Cells.Item(c).Value2
+                    lvals(r, c) = .BBRow.Cells.Item(c).Value2
                 Next c
             End If
         End With
     Next r
         
+    rvals(0, 0) = "address"
+    For c = 1 To colnum
+        rvals(0, c) = "column" & c
+    Next c
+    
     For r = 1 To num
         With editPnts(r)
             If Not .AARow Is Nothing Then
-                rvals(r, 1) = GetSheetAddress_(.AARow)
+                rvals(r, 0) = GetSheetAddress_(.AARow)
                 For c = 1 To alen
-                    rvals(r, c + 1) = .AARow.Cells.Item(c).Value2
+                    rvals(r, c) = .AARow.Cells.Item(c).Value2
                 Next c
             End If
         End With

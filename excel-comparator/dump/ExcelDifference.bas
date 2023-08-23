@@ -13,7 +13,7 @@ Public Type EditPoint
     BBRow As Range
 End Type
 
-Private Enum Direction_
+Public Enum EditDirection
     None_
     Same
     Delete ' down  x: +1
@@ -47,8 +47,7 @@ Public Function DiffExcel( _
     ReDim fp(-m - 1 To n + 1)
     For i = -m - 1 To n + 1: fp(i) = -1: Next i
     
-    Dim editGrph() As Direction_
-    ReDim editGrph(0 To m, 0 To n)
+    Dim editGrph As New EditGraph
     
     Dim p As Long, k As Long, y As Long
     For p = 0 To m
@@ -69,6 +68,7 @@ Public Function DiffExcel( _
         End If
     Next p
 
+    Set editGrph = Nothing
 End Function
 
 Private Function Snake_( _
@@ -76,7 +76,7 @@ Private Function Snake_( _
     b As Range, _
     k As Long, _
     y As Long, _
-    editGrph() As Direction_, _
+    editGrph As EditGraph, _
     ignoreNum As Boolean, _
     tolernce As Long _
     ) As Long
@@ -87,7 +87,7 @@ Private Function Snake_( _
     While xx < a.Rows.Count And yy < b.Rows.Count And IsSame_(a.Rows(xx + 1), b.Rows(yy + 1), ignoreNum, tolernce)
         xx = xx + 1
         yy = yy + 1
-        editGrph(xx, yy) = Same
+        editGrph.Add xx, yy, Same
     Wend
     
     Snake_ = yy
@@ -132,17 +132,17 @@ Private Function IsSame_(arow As Range, brow As Range, ignoreNum As Boolean, tol
     IsSame_ = True
 End Function
 
-Private Function MaxAndAddDirection_(v0 As Long, v1 As Long, k As Long, editGrph() As Direction_) As Long
+Private Function MaxAndAddDirection_(v0 As Long, v1 As Long, k As Long, editGrph As EditGraph) As Long
     If v0 > v1 Then
         MaxAndAddDirection_ = v0
-        editGrph(v0 - k, v0) = Insert
+        editGrph.Add v0 - k, v0, Insert
     Else
         MaxAndAddDirection_ = v1
-        editGrph(v1 - k, v1) = Delete
+        editGrph.Add v1 - k, v1, Delete
     End If
 End Function
 
-Private Function GetEditPoints_(a As Range, b As Range, editGrph() As Direction_) As EditPoint()
+Private Function GetEditPoints_(a As Range, b As Range, editGrph As EditGraph) As EditPoint()
     Dim xx As Long, yy As Long
     xx = a.Rows.Count
     yy = b.Rows.Count
@@ -150,7 +150,7 @@ Private Function GetEditPoints_(a As Range, b As Range, editGrph() As Direction_
     Dim rvrs() As EditPoint
     ReDim rvrs(1 To xx + yy)
     
-    Dim drct As Direction_
+    Dim drct As EditDirection
     Dim i As Integer
     i = 0
     
@@ -158,7 +158,7 @@ Private Function GetEditPoints_(a As Range, b As Range, editGrph() As Direction_
         i = i + 1
         
         With rvrs(i)
-            drct = editGrph(xx, yy)
+            drct = editGrph.GetDirection(xx, yy)
             
             If drct = Delete Then
                 .ABType = AARow

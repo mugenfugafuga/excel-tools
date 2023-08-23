@@ -279,6 +279,8 @@ Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_, ignoreNum As Bo
     Dim com1With2Result As ComResult_
     Dim com2With1Result As ComResult_
     
+    Const baseRow = 7
+    
     Set wb1 = OpenBook_(file1)
     With wb1
         Set no1 = CopySheetAfterTarget(.Sheets(1), resultbook.Sheets(1))
@@ -302,70 +304,249 @@ Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_, ignoreNum As Bo
     End With
     
     Dim twoM As TwoMatrices
-    Dim lr As Range, rr As Range
-    Dim th1 As Range, th2 As Range
+    Dim lr As Range, ldt As Range
+    Dim rr As Range, rdt As Range
+    Dim mtchfuncs As Range, numdiffunc As Range
+    Dim tlrnc As Range
+    Dim unmtch As Range, witlr As Range, ootlr As Range
     
     With resultbook.Sheets(1)
         twoM = EditPointsTo2Matrices(DiffExcel(no1.UsedRange, no2.UsedRange, ignoreNum, tolernce))
         
-        With .Cells(5, 1)
-            .Offset(0, 0) = "閾値1": .Offset(0, 1) = 1000
-            .Offset(0, 0).HorizontalAlignment = xlRight
-            Set th1 = .Offset(0, 1)
-            
-            .Offset(0, 2) = "閾値2": .Offset(0, 3) = 0.00001
-            .Offset(0, 2).HorizontalAlignment = xlRight
-            Set th2 = .Offset(0, 3)
+        With .Cells(5, 5)
+            .Offset(0, 0) = "許容値": .Offset(0, 1) = 0.00001
+            Set tlrnc = .Offset(0, 1)
         End With
         
-        Set lr = PrintVariantOnRange(twoM.Left, .Cells(7, 1))
-        Set rr = PrintVariantOnRange(twoM.Right, lr.Cells(1, lr.Columns.Count).Offset(0, 2))
+        Set lr = PrintVariantOnRange(twoM.Left, .Cells(baseRow, 5))
+        GetAddressArea_(lr).Interior.Color = RGB(252, 228, 214)
+        Set ldt = GetDataArea_(lr)
         
-        UpdateFormatConditions_ SkipColumns_(lr), SkipColumns_(rr), th1, th2
-        UpdateFormatConditions_ SkipColumns_(rr), SkipColumns_(lr), th1, th2
+        
+        Set rr = PrintVariantOnRange(twoM.Right, lr.Cells(1, lr.Columns.Count).Offset(0, 2))
+        GetAddressArea_(rr).Interior.Color = RGB(214, 220, 228)
+        Set rdt = GetDataArea_(rr)
+        
+        UpdateFormatConditions_ ldt, rdt, tlrnc
+        
+        Set mtchfuncs = PrintVariantOnRange(GetMatchFunctions_(ldt, rdt), rr.Cells(1, rr.Columns.Count).Offset(0, 2))
+        Set numdiffunc = PrintVariantOnRange(GetNumericDiffFunctions_(ldt, rdt), mtchfuncs.Cells(1, mtchfuncs.Columns.Count).Offset(0, 2))
+        
+        Set unmtch = PrintVariantOnRange(GetCountUnmatchFunctions_(mtchfuncs), .Cells(baseRow, 1))
+        Set witlr = PrintVariantOnRange(GetCountWithinToleranceFunctions_(numdiffunc, tlrnc), .Cells(baseRow, 2))
+        Set ootlr = PrintVariantOnRange(GetCountOutOfToleranceFunctions_(unmtch, witlr), .Cells(baseRow, 3))
+        
+        SetDataBar_ witlr, RGB(200, 255, 255)
+        SetDataBar_ ootlr, RGB(255, 0, 0)
+        
+        With .Cells(4, 1)
+            .Offset(0, 0) = "完全一致":     .Offset(0, 1) = "=IF(SUM(" & SkipFirstRow_(unmtch).Address(RowAbsolute:=False, ColumnAbsolute:=False) & ")=0,""OK"",""NG"")"
+            .Offset(1, 0) = "許容値内一致": .Offset(1, 1) = "=IF(SUM(" & SkipFirstRow_(ootlr).Address(RowAbsolute:=False, ColumnAbsolute:=False) & ")=0,""OK"",""NG"")"
+        End With
         
         .Name = "結果"
         .Cells.EntireColumn.AutoFit
         
-        With .Cells(2, 1)
+        With .Cells(1, 1)
             .Offset(0, 0) = "①": .Offset(0, 0).HorizontalAlignment = xlRight: .Offset(0, 1) = file1.Path
             .Offset(1, 0) = "②": .Offset(1, 0).HorizontalAlignment = xlRight: .Offset(1, 1) = file2.Path
         End With
         
+        .Columns("D:D").ColumnWidth = 2
+        .Rows(baseRow).Font.Bold = True
+         
         .Activate
+        
+        .Cells(baseRow + 1, 5).Select
+        ActiveWindow.FreezePanes = True
     End With
+End Function
+
+Private Function SetDataBar_(rng As Range, rgbnum As Long)
+    With rng.FormatConditions
+        .Delete
+        
+        .AddDatabar
+        With .Item(1)
+            .BarBorder.Type = xlDataBarBorderSolid
+            .BarColor.Color = rgbnum
+            .BarBorder.Color.Color = rgbnum
+        End With
+    End With
+End Function
+
+Private Function SkipFirstRow_(rng As Range) As Range
+    With rng
+        Set SkipFirstRow_ = Range(.Cells(2, 1), .Cells(.Rows.Count, .Columns.Count))
+    End With
+End Function
+
+Private Function GetCountUnmatchFunctions_(mtchRange As Range) As Variant
+    Dim ret() As Variant
+    
+    Dim rnum As Long, r As Long
+    rnum = mtchRange.Rows.Count
+    
+    ReDim ret(1 To rnum, 1 To 1)
+    
+    ret(1, 1) = "不一致"
+    
+    With mtchRange
+        For r = 2 To rnum
+            ret(r, 1) = "=COUNTIF(" & .Rows(r).Address(RowAbsolute:=False, ColumnAbsolute:=False) & ",FALSE)"
+        Next r
+    End With
+    
+    GetCountUnmatchFunctions_ = ret
+End Function
+
+Private Function GetCountWithinToleranceFunctions_(numdifRange As Range, tlrnc As Range) As Variant
+    Dim ret() As Variant
+    
+    Dim rnum As Long, r As Long
+    rnum = numdifRange.Rows.Count
+    
+    ReDim ret(1 To rnum, 1 To 1)
+    
+    ret(1, 1) = "許容値内"
+    
+    Dim adrs As String
+    With numdifRange
+        For r = 2 To rnum
+            adrs = .Rows(r).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+            ret(r, 1) = "=COUNTIFS(" & adrs & ","">0""," & adrs & ",""<=""&" & tlrnc.Address & ")"
+        Next r
+    End With
+    
+    GetCountWithinToleranceFunctions_ = ret
+End Function
+
+Private Function GetCountOutOfToleranceFunctions_(unmatchRange As Range, numdifRange As Range) As Variant
+    Dim ret() As Variant
+    
+    Dim rnum As Long, r As Long
+    rnum = numdifRange.Rows.Count
+    
+    ReDim ret(1 To rnum, 1 To 1)
+    
+    ret(1, 1) = "許容値外"
+    
+    Dim adrs As String
+    With numdifRange
+        For r = 2 To rnum
+            ret(r, 1) = "=" & _
+                unmatchRange.Cells(r, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False) & "-" & _
+                .Cells(r, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+        Next r
+    End With
+    
+    GetCountOutOfToleranceFunctions_ = ret
+End Function
+Private Function GetMatchFunctions_(ldata As Range, rdata As Range) As Variant
+    Dim rnum As Long, cnum As Long
+    
+    rnum = ldata.Rows.Count
+    cnum = ldata.Columns.Count
+    
+    Dim ret() As Variant
+    ReDim ret(0 To rnum, 1 To cnum)
+    
+    Dim r As Long, c As Long
+    
+    ret(0, 1) = "一致"
+    For r = 1 To rnum
+        For c = 1 To cnum
+            ret(r, c) = "=" & _
+                ldata.Cells(r, c).Address(RowAbsolute:=False, ColumnAbsolute:=False) & "=" & _
+                rdata.Cells(r, c).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+        Next c
+    Next r
+    
+    GetMatchFunctions_ = ret
+End Function
+
+Private Function GetNumericDiffFunctions_(ldata As Range, rdata As Range) As Variant
+    Dim rnum As Long, cnum As Long
+    
+    rnum = ldata.Rows.Count
+    cnum = ldata.Columns.Count
+    
+    Dim ret() As Variant
+    ReDim ret(0 To rnum, 1 To cnum)
+    
+    Dim r As Long, c As Long
+    
+    Dim rad As String, lad As String
+    
+    ret(0, 1) = "数値差分"
+    For r = 1 To rnum
+        For c = 1 To cnum
+            lad = ldata.Cells(r, c).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+            rad = rdata.Cells(r, c).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+            
+            ret(r, c) = "=IF(AND(ISNUMBER(" & lad & "),ISNUMBER(" & rad & ")),ABS(" & lad & "-" & rad & "),0)"
+        Next c
+    Next r
+    
+    GetNumericDiffFunctions_ = ret
 End Function
 
 Private Function UpdateFormatConditions_( _
-    target As Range, _
-    othr As Range, _
-    th1 As Range, _
-    th2 As Range)
-    Dim ttop As String, otop As String
-    ttop = target.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
-    otop = othr.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
-
-    With target.FormatConditions
+    lft As Range, _
+    rght As Range, _
+    tlrnc As Range)
+    
+    Dim ltop As String, rtop As String, trl As String
+    
+    ltop = lft.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+    rtop = rght.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+    trl = tlrnc.Cells(1, 1).Address
+    
+    With lft.FormatConditions
         .Delete
         
-        .Add Type:=xlExpression, Formula1:="=ISBLANK(" & ttop & ")"
-        .Item(1).Interior.Color = RGB(250, 250, 210)
+        .Add _
+            Type:=xlExpression, _
+            Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & "),0<ABS(" & ltop & "-" & rtop & "),ABS(" & ltop & "-" & rtop & ")<=" & trl & ")"
+        .Item(1).Interior.Color = RGB(200, 255, 255)
         
-        .Add Type:=xlExpression, Formula1:="=ABS(" & ttop & "-" & otop & ")>" & th1.Cells(1, 1).Address
-        .Item(2).Interior.Color = RGB(255, 165, 0)
+        .Add _
+            Type:=xlExpression, _
+            Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & ")," & trl & "<ABS(" & ltop & "-" & rtop & "))"
+        .Item(2).Interior.Color = RGB(255, 0, 0)
         
-        .Add Type:=xlExpression, Formula1:="=ABS(" & ttop & "-" & otop & ")>" & th2.Cells(1, 1).Address
-        .Item(3).Interior.Color = RGB(175, 238, 238)
+        .Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=" & rtop
+        .Item(3).Interior.Color = RGB(240, 100, 100)
+    End With
+
+    With rght.FormatConditions
+        .Delete
         
-        .Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=" & otop
-        .Item(4).Interior.Color = RGB(255, 99, 71)
+        .Add _
+            Type:=xlExpression, _
+            Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & "),0<ABS(" & ltop & "-" & rtop & "),ABS(" & ltop & "-" & rtop & ")<=" & trl & ")"
+        .Item(1).Interior.Color = RGB(173, 255, 47)
         
+        .Add _
+            Type:=xlExpression, _
+            Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & ")," & trl & "<ABS(" & ltop & "-" & rtop & "))"
+        .Item(2).Interior.Color = RGB(255, 69, 0)
+        
+        .Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=" & ltop
+        .Item(3).Interior.Color = RGB(255, 140, 0)
+    End With
+
+End Function
+
+Private Function GetAddressArea_(rng As Range) As Range
+    With rng
+        Set GetAddressArea_ = Range(.Cells(2, 1), .Cells(.Rows.Count, 1))
     End With
 End Function
 
-Private Function SkipColumns_(rng As Range, Optional cols As Long = 1) As Range
+Private Function GetDataArea_(rng As Range) As Range
     With rng
-        Set SkipColumns_ = Range(.Cells(1, cols + 1), .Cells(.Rows.Count, .Columns.Count))
+        Set GetDataArea_ = Range(.Cells(2, 2), .Cells(.Rows.Count, .Columns.Count))
     End With
 End Function
 
