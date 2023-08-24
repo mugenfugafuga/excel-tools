@@ -308,17 +308,18 @@ Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_, ignoreNum As Bo
     Dim rr As Range, rdt As Range
     Dim mtchfuncs As Range, numdiffunc As Range
     Dim tlrnc As Range
-    Dim unmtch As Range, witlr As Range, ootlr As Range
+    Dim unmtch As Range, witlr As Range
+    Dim ootlr As Range, lorr As Range
     
     With resultbook.Sheets(1)
         twoM = EditPointsTo2Matrices(DiffExcel(no1.UsedRange, no2.UsedRange, ignoreNum, tolernce))
         
-        With .Cells(5, 5)
+        With .Cells(5, 6)
             .Offset(0, 0) = "ãñóeíl": .Offset(0, 1) = 0.00001
             Set tlrnc = .Offset(0, 1)
         End With
         
-        Set lr = PrintVariantOnRange(twoM.Left, .Cells(baseRow, 5))
+        Set lr = PrintVariantOnRange(twoM.Left, .Cells(baseRow, 6))
         GetAddressArea_(lr).Interior.Color = RGB(252, 228, 214)
         Set ldt = GetDataArea_(lr)
         
@@ -327,17 +328,18 @@ Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_, ignoreNum As Bo
         GetAddressArea_(rr).Interior.Color = RGB(214, 220, 228)
         Set rdt = GetDataArea_(rr)
         
-        UpdateFormatConditions_ ldt, rdt, tlrnc
-        
         Set mtchfuncs = PrintVariantOnRange(GetMatchFunctions_(ldt, rdt), rr.Cells(1, rr.Columns.Count).Offset(0, 2))
         Set numdiffunc = PrintVariantOnRange(GetNumericDiffFunctions_(ldt, rdt), mtchfuncs.Cells(1, mtchfuncs.Columns.Count).Offset(0, 2))
         
         Set unmtch = PrintVariantOnRange(GetCountUnmatchFunctions_(mtchfuncs), .Cells(baseRow, 1))
         Set witlr = PrintVariantOnRange(GetCountWithinToleranceFunctions_(numdiffunc, tlrnc), .Cells(baseRow, 2))
         Set ootlr = PrintVariantOnRange(GetCountOutOfToleranceFunctions_(unmtch, witlr), .Cells(baseRow, 3))
+        Set lorr = PrintVariantOnRange(GetLeftOrRightFunctions_(lr, rr), .Cells(baseRow, 4))
         
         SetDataBar_ witlr, RGB(200, 255, 255)
         SetDataBar_ ootlr, RGB(255, 0, 0)
+        
+        UpdateFormatConditions_ ldt, rdt, tlrnc, lorr
         
         With .Cells(4, 1)
             .Offset(0, 0) = "äÆëSàÍív":     .Offset(0, 1) = "=IF(SUM(" & SkipFirstRow_(unmtch).Address(RowAbsolute:=False, ColumnAbsolute:=False) & ")=0,""OK"",""NG"")"
@@ -352,12 +354,12 @@ Private Function DoDiff_(file1 As FileItem_, file2 As FileItem_, ignoreNum As Bo
             .Offset(1, 0) = "áA": .Offset(1, 0).HorizontalAlignment = xlRight: .Offset(1, 1) = file2.Path
         End With
         
-        .Columns("D:D").ColumnWidth = 2
+        .Columns(5).ColumnWidth = 2
         .Rows(baseRow).Font.Bold = True
          
         .Activate
         
-        .Cells(baseRow + 1, 5).Select
+        .Cells(baseRow + 1, 6).Select
         ActiveWindow.FreezePanes = True
     End With
 End Function
@@ -379,6 +381,37 @@ Private Function SkipFirstRow_(rng As Range) As Range
     With rng
         Set SkipFirstRow_ = Range(.Cells(2, 1), .Cells(.Rows.Count, .Columns.Count))
     End With
+End Function
+
+Private Function GetLeftOrRightFunctions_(lft As Range, rght As Range) As Variant
+    Dim ret() As Variant
+    
+    Dim rnum As Long, cnum As Long
+    rnum = lft.Rows.Count
+    cnum = lft.Columns.Count
+    
+    ReDim ret(1 To rnum, 1 To 1)
+    
+    Dim ladd As String
+    Dim radd As String
+    
+    Dim r As Long
+    
+    ret(1, 1) = "î‰äråãâ "
+    
+    For r = 2 To rnum
+        With lft.Rows(r)
+            ladd = Range(.Cells(1, 2), .Cells(1, cnum)).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+        End With
+        
+        With rght.Rows(r)
+            radd = Range(.Cells(1, 2), .Cells(1, cnum)).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+        End With
+        
+        ret(r, 1) = "=IF(COUNTA(" & ladd & ")=0,IF(COUNTA(" & radd & ")=0,""ílÇ»Çµ"",""Right""),IF(COUNTA(" & radd & ")=0,""Left"",""Same""))"
+    Next r
+    
+    GetLeftOrRightFunctions_ = ret
 End Function
 
 Private Function GetCountUnmatchFunctions_(mtchRange As Range) As Variant
@@ -453,7 +486,10 @@ Private Function GetMatchFunctions_(ldata As Range, rdata As Range) As Variant
     
     Dim r As Long, c As Long
     
-    ret(0, 1) = "àÍív"
+    For c = 1 To cnum
+        ret(0, c) = "match" & c
+    Next c
+    
     For r = 1 To rnum
         For c = 1 To cnum
             ret(r, c) = "=" & _
@@ -478,7 +514,10 @@ Private Function GetNumericDiffFunctions_(ldata As Range, rdata As Range) As Var
     
     Dim rad As String, lad As String
     
-    ret(0, 1) = "êîílç∑ï™"
+    For c = 1 To cnum
+        ret(0, c) = "diff" & c
+    Next c
+    
     For r = 1 To rnum
         For c = 1 To cnum
             lad = ldata.Cells(r, c).Address(RowAbsolute:=False, ColumnAbsolute:=False)
@@ -494,46 +533,58 @@ End Function
 Private Function UpdateFormatConditions_( _
     lft As Range, _
     rght As Range, _
-    tlrnc As Range)
+    tlrnc As Range, _
+    lorr As Range)
     
-    Dim ltop As String, rtop As String, trl As String
+    Dim ltop As String, rtop As String
+    Dim trl As String, lr As String
     
     ltop = lft.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
     rtop = rght.Cells(1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
     trl = tlrnc.Cells(1, 1).Address
+    lr = lorr.Cells(2, 1).Address(RowAbsolute:=False)
     
     With lft.FormatConditions
         .Delete
         
         .Add _
             Type:=xlExpression, _
+            Formula1:="=" & lr & "=""Right"""
+        .Item(1).Interior.Color = RGB(255, 255, 0)
+        
+        .Add _
+            Type:=xlExpression, _
             Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & "),0<ABS(" & ltop & "-" & rtop & "),ABS(" & ltop & "-" & rtop & ")<=" & trl & ")"
-        .Item(1).Interior.Color = RGB(200, 255, 255)
+        .Item(2).Interior.Color = RGB(200, 255, 255)
         
         .Add _
             Type:=xlExpression, _
             Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & ")," & trl & "<ABS(" & ltop & "-" & rtop & "))"
-        .Item(2).Interior.Color = RGB(255, 0, 0)
+        .Item(3).Interior.Color = RGB(255, 0, 0)
         
         .Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=" & rtop
-        .Item(3).Interior.Color = RGB(240, 100, 100)
+        .Item(4).Interior.Color = RGB(240, 100, 100)
     End With
 
     With rght.FormatConditions
         .Delete
-        
+        .Add _
+            Type:=xlExpression, _
+            Formula1:="=" & lr & "=""Left"""
+        .Item(1).Interior.Color = RGB(255, 255, 0)
+
         .Add _
             Type:=xlExpression, _
             Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & "),0<ABS(" & ltop & "-" & rtop & "),ABS(" & ltop & "-" & rtop & ")<=" & trl & ")"
-        .Item(1).Interior.Color = RGB(173, 255, 47)
+        .Item(2).Interior.Color = RGB(173, 255, 47)
         
         .Add _
             Type:=xlExpression, _
             Formula1:="=AND(ISNUMBER(" & ltop & "),ISNUMBER(" & rtop & ")," & trl & "<ABS(" & ltop & "-" & rtop & "))"
-        .Item(2).Interior.Color = RGB(255, 69, 0)
+        .Item(3).Interior.Color = RGB(255, 69, 0)
         
         .Add Type:=xlCellValue, Operator:=xlNotEqual, Formula1:="=" & ltop
-        .Item(3).Interior.Color = RGB(255, 140, 0)
+        .Item(4).Interior.Color = RGB(255, 140, 0)
     End With
 
 End Function
